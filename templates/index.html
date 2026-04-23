@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Amex → Business Central Converter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+      padding: 48px 44px 40px;
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: #1F3864;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    h1 {
+      font-size: 20px;
+      color: #1F3864;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    h1 span { color: #2E75B6; }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #b0c4de;
+      border-radius: 12px;
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #f7faff;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #2E75B6;
+      background: #eaf2ff;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 40px; margin-bottom: 12px; }
+    .drop-text { color: #444; font-size: 15px; font-weight: 600; }
+    .drop-sub  { color: #888; font-size: 13px; margin-top: 4px; }
+
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: #eaf2ff;
+      border: 1px solid #b0c4de;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 14px;
+      color: #1F3864;
+    }
+    .file-selected .fname { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-selected .remove { cursor: pointer; color: #888; font-size: 18px; line-height: 1; }
+    .file-selected .remove:hover { color: #c00; }
+
+    .btn-convert {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 14px;
+      background: #1F3864;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .btn-convert:hover:not(:disabled) { background: #2E75B6; }
+    .btn-convert:disabled { background: #b0b8c4; cursor: not-allowed; }
+
+    /* Status */
+    .status {
+      display: none;
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .status.loading {
+      display: flex; align-items: center; gap: 12px;
+      background: #eaf2ff; color: #1F3864;
+    }
+    .status.success {
+      display: flex; align-items: center; gap: 12px;
+      background: #e8f5e9; color: #1b5e20;
+    }
+    .status.error {
+      display: block;
+      background: #ffeaea; color: #c00;
+    }
+
+    .spinner {
+      width: 20px; height: 20px; flex-shrink: 0;
+      border: 3px solid #b0c4de;
+      border-top-color: #2E75B6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .how-it-works {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e8edf2;
+    }
+    .how-it-works h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #888;
+      margin-bottom: 14px;
+    }
+    .steps { display: flex; flex-direction: column; gap: 10px; }
+    .step {
+      display: flex; align-items: flex-start; gap: 12px;
+      font-size: 13px; color: #444;
+    }
+    .step-num {
+      width: 22px; height: 22px; flex-shrink: 0;
+      background: #1F3864; color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-row">
+    <div class="logo-icon">📊</div>
+    <h1>Amex → <span>Business Central</span></h1>
+  </div>
+
+  <p class="subtitle">
+    Upload your monthly Amex export and get a BC-ready file instantly —
+    columns re-ordered, Salesperson Code moved to last position.
+  </p>
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".csv" />
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">Drop your Amex CSV here</div>
+    <div class="drop-sub">or click to browse</div>
+  </div>
+
+  <div class="file-selected" id="fileSelected">
+    <span>📄</span>
+    <span class="fname" id="fileName"></span>
+    <span class="remove" id="removeFile" title="Remove">✕</span>
+  </div>
+
+  <button class="btn-convert" id="convertBtn" disabled>
+    Convert to BC Format
+  </button>
+
+  <div class="status loading" id="statusLoading">
+    <div class="spinner"></div>
+    <span>Processing your file…</span>
+  </div>
+  <div class="status success" id="statusSuccess">
+    <span>✅</span>
+    <span id="successMsg"></span>
+  </div>
+  <div class="status error" id="statusError"></div>
+
+  <div class="how-it-works">
+    <h3>How it works</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><span>Export CSV from Amex @ Work portal as usual</span></div>
+      <div class="step"><div class="step-num">2</div><span>Drop it here — your file never leaves your browser session and is not stored</span></div>
+      <div class="step"><div class="step-num">3</div><span>Download the BC-ready file and upload directly to Business Central</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const dropZone   = document.getElementById('dropZone');
+  const fileInput  = document.getElementById('fileInput');
+  const fileSelected = document.getElementById('fileSelected');
+  const fileName   = document.getElementById('fileName');
+  const removeFile = document.getElementById('removeFile');
+  const convertBtn = document.getElementById('convertBtn');
+  const statusLoading = document.getElementById('statusLoading');
+  const statusSuccess = document.getElementById('statusSuccess');
+  const statusError   = document.getElementById('statusError');
+  const successMsg    = document.getElementById('successMsg');
+
+  let selectedFile = null;
+
+  function setFile(file) {
+    if (!file) return;
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSelected.style.display = 'flex';
+    convertBtn.disabled = false;
+    clearStatus();
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    fileSelected.style.display = 'none';
+    convertBtn.disabled = true;
+    clearStatus();
+  }
+
+  function clearStatus() {
+    statusLoading.style.display = 'none';
+    statusSuccess.style.display = 'none';
+    statusError.style.display = 'none';
+  }
+
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+  removeFile.addEventListener('click', clearFile);
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) setFile(file);
+    else { statusError.textContent = 'Please drop a CSV file.'; statusError.style.display = 'block'; }
+  });
+
+  convertBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    clearStatus();
+    statusLoading.style.display = 'flex';
+    convertBtn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch('/convert', { method: 'POST', body: formData });
+
+      if (!res.ok) {
+        const data = await res.json();
+        statusLoading.style.display = 'none';
+        statusError.textContent = data.error || 'Something went wrong. Please try again.';
+        statusError.style.display = 'block';
+        convertBtn.disabled = false;
+        return;
+      }
+
+      // Count rows from content-disposition or just trigger download
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const outName = match ? match[1] : 'BC_Ready.csv';
+
+      // Trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = outName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      statusLoading.style.display = 'none';
+      successMsg.textContent = `File ready — "${outName}" is downloading now.`;
+      statusSuccess.style.display = 'flex';
+      convertBtn.disabled = false;
+
+    } catch (err) {
+      statusLoading.style.display = 'none';
+      statusError.textContent = 'Network error. Please try again.';
+      statusError.style.display = 'block';
+      convertBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
