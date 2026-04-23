@@ -1,5 +1,5 @@
 from flask import Flask, request, send_file, render_template, jsonify
-import pandas as pd
+import csv
 import io
 import os
 from datetime import datetime
@@ -23,6 +23,7 @@ BEFORE_COLS = [
 
 # Salesperson Code moves from index 7 to the last position
 AFTER_COL_ORDER = list(range(0, 7)) + list(range(8, 39)) + [7]
+AFTER_COLS = [BEFORE_COLS[i] for i in AFTER_COL_ORDER]
 
 
 @app.route('/')
@@ -40,26 +41,27 @@ def convert():
         return jsonify({'error': 'Please upload a CSV file'}), 400
 
     try:
-        df = pd.read_csv(file, dtype=str).fillna('')
+        content = file.read().decode('utf-8-sig')  # utf-8-sig handles BOM if present
+        reader = csv.DictReader(io.StringIO(content))
+        rows = list(reader)
+        headers = reader.fieldnames or []
     except Exception as e:
         return jsonify({'error': f'Could not read file: {str(e)}'}), 400
 
     # Validate columns
-    missing = [c for c in BEFORE_COLS if c not in df.columns]
+    missing = [c for c in BEFORE_COLS if c not in headers]
     if missing:
         return jsonify({
             'error': f"This doesn't look like an Amex export. Missing columns: {', '.join(missing[:3])}"
                      + (f' and {len(missing) - 3} more.' if len(missing) > 3 else '.')
         }), 400
 
-    # Transform
-    df_bc = df[BEFORE_COLS].iloc[:, AFTER_COL_ORDER]
-    row_count = len(df_bc)
-
-    # Write to in-memory CSV
+    # Transform: reorder columns
     output = io.StringIO()
-    df_bc.to_csv(output, index=False)
-    output.seek(0)
+    writer = csv.DictWriter(output, fieldnames=AFTER_COLS, extrasaction='ignore', lineterminator='\n')
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({col: row.get(col, '') for col in AFTER_COLS})
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M')
     original = os.path.splitext(file.filename)[0]
